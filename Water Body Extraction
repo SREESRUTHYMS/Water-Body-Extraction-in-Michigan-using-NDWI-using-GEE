@@ -1,0 +1,49 @@
+/* 
+Making use of Sentinel 2 MSI Surface Reflectance imagery to extract 
+water bodies of michigan state using NDWI
+*/ 
+
+// Fetch the Sentinel-2 Level 2A Surface Reflectance Imagery 
+var michigan = ee.FeatureCollection("projects/stable-matter-478806-s2/assets/michigan");
+var S2 = ee.ImageCollection('COPERNICUS/S2_SR_HARMONIZED');
+Map.addLayer(michigan, {}, "MICHIGAN");
+Map.centerObject(michigan, 15);
+Map.addLayer(michigan.style({
+  color: 'red',
+  fillColor: '00000000',
+  width: 2
+}), {}, "MICHIGAN Boundary");
+
+//Filter images for year 2025 and create median images
+var S2filtered = S2.filterDate('2025-01-01', '2026-01-01')
+                   .filterBounds(michigan);
+              
+Map.centerObject(michigan,8);
+
+var S2filtered_median = S2filtered.median().clip(michigan);
+
+var visualization = {"opacity":1,"bands":["B4","B3","B2"],"min":442.9375,"max":1830.4,"gamma":1};
+
+
+Map.addLayer(S2filtered_median, visualization, 'S2 cloudfree');   
+print(S2filtered_median);
+
+/*--------------------------------------------------------------------------------------*/
+
+//calculate the NDWI using (Green-NIR)/(Green + NIR) using image.normailisedDifference() function
+
+var NDWI = S2filtered_median.normalizedDifference(['B3', 'B8']);
+
+// setting the threshold value for waterbody extraction
+var NDWIThreshold = 0;
+
+/* Masking the image such that the pixel value which are greater than or equal to threshold value 
+will be displayed in the map view and other pixels(masked pixels) will not visible */
+// var image = image.clip(michigan);- for clipping
+var mask = NDWI.gte(NDWIThreshold).rename('mask');
+Map.addLayer(mask,{},'watermask');
+var NDWIWatermasked = NDWI.updateMask(mask);
+Map.addLayer(NDWIWatermasked,{palette:'blue'},'S2 NDWI water masked');
+
+
+
